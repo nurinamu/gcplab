@@ -1,0 +1,401 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>GCPLab Tutorial #1 - Datastore</title>
+
+<link rel="stylesheet" href="/css/bootstrap.min.css" tyle="text/css">
+<script type="text/javascript" src="/js/jquery.1.10.2.js"></script>
+<script type="text/javascript" src="/js/jquery.cookie.js"></script>
+<script type="text/javascript" src="/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="/js/gcplab.util.js"></script>
+<script>
+	$(document).ready(function(){
+		var signedInId = $.cookie('gcplab_idStr');
+		$('#tmpImg').hide();
+		if(signedInId){
+			$('#signedInID').text(signedInId);
+			
+			$('#postBtn').click(function(){
+				addNakSeo();
+			});
+			
+			$('#newNakSeo').keydown(function(){
+				if(event.keyCode == 13){
+					addNakSeo();
+					return false;
+				}
+			}).on('drop', function(ev){
+				if(ev.originalEvent && ev.originalEvent.dataTransfer && ev.originalEvent.dataTransfer.files.length > 0){
+					var fileItem = ev.originalEvent.dataTransfer.files[0];
+					getNewBlobPath(function(resp){
+						if(resp.result == 'success'){
+							var formData = new FormData();
+							formData.append('source', fileItem, fileItem.name);
+							$.ajax({
+								url:URLDecode(resp.path),
+								type:"POST",
+								data:formData,
+								dataType:'json',
+								processData:false,
+								contentType:false,
+								cache:false,
+								success:function(resp){
+									if(resp.result=='success'){
+										$('#tmpImg').attr('src','/cmd/image?blobKey='+resp.blobKey);
+										$('#blobKey').val(resp.blobKey);
+										$('#tmpImg').show();
+									}
+								},error: function(e,h,x){
+									
+								},complete:function(data){
+								}
+							});
+						}
+					})
+				}
+				return false;
+			});
+			
+			$('#fetchOpt').change(function(){
+				noMore = false;
+				fetchNakSeo(true);
+			})
+			
+			fetchNakSeo(true);
+			listNakSeo = $('#listNakSeo');
+			$(window).bind('scroll', scrolled);
+			
+			$('#notSignedIn').hide();
+			$('#signedIn').show();
+		}else{
+			$('#notSignedIn').show();
+			$('#signedIn').hide();
+		}
+	});
+	
+	function getNewBlobPath(callback_){
+		$.ajax({
+			url:"/cmd/image",
+			type:"GET",
+			data:{
+				path:URLEncode('/cmd/image')
+			},
+			dataType:"json",
+			success:callback_,
+			error:function(e){
+				console.log(e.statusCode());
+			},
+			complete:function(e){
+				console.log(e);
+			}
+		});
+	}
+	
+	function URLEncode(s) {
+		s = encodeURIComponent (s);
+		s = s.replace (/\~/g, '%7E').replace (/\!/g, '%21').replace (/\(/g, '%28').replace (/\)/g, '%29').replace (/\'/g, '%27');
+		s = s.replace (/%20/g, '+');
+		return s;
+	}
+	
+	function URLDecode(s) {
+		s = s.replace (/\+/g, '%20');
+		s = decodeURIComponent (s);
+		return s;
+	}
+	
+	var listNakSeo;
+	
+	function scrolled(e) {
+	    if ($(document).scrollTop()+window.innerHeight >= $(window).innerHeight()) {
+	    	//GCPLabUtil.toast('bottom!');
+	        fetchNakSeo(false);
+	    }
+	}
+	
+	function openModal(modalID){
+		$('#'+modalID).modal('show');
+	}
+	
+	function register(){
+		$.ajax({
+			url:"/cmd/register",
+			type:"POST",
+			data:{
+				idStr : $('#signUpIdStr').val(),
+				password : $('#signUpPwd').val()
+			},
+			dataType:"json",
+			success:function(result){
+				if(result.result == 'success'){
+					$('#signUpModal').modal('hide');
+					$.cookie('gcplab_idStr', result.idStr);
+					$.cookie('gcplab_encKey', result.encKey);
+					location.href='/';
+				}else{
+					GCPLabUtil.toast('Failed to register!','error');
+				}
+			}
+		});
+	}
+	
+	function signIn(){
+		$.ajax({
+			url:"/cmd/jange",
+			type:"POST",
+			data:{
+				idStr : $('#signInIdStr').val(),
+				password : $('#signInPwd').val()
+			},
+			dataType:"json",
+			success:function(result){
+				if(result.result == 'success'){
+					$('#signInModal').modal('hide');
+					$.cookie('gcplab_idStr', result.idStr);
+					$.cookie('gcplab_encKey', result.encKey);
+					location.href='/';
+				}else{
+					GCPLabUtil.toast('Failed to sign in!','error');
+				}
+			}
+		});
+	}
+	
+	function signOut(){
+		$.removeCookie('gcplab_idStr');
+		location.href='/';
+	}
+	
+	function addNakSeo(){
+		$.ajax({
+			url:"/cmd/nakseo",
+			type:"POST",
+			data:{
+				encKey:$.cookie('gcplab_encKey'),
+				content:GCPLabUtil.encode($('#newNakSeo').val()),
+				blobKey:$('#blobKey').val()
+			},
+			dataType:"json",
+			success:function(result){
+				if(result.result == 'success'){
+					$('#newNakSeo').val('');
+					$('#tmpImg').hide();
+					noMore = false;
+					fetchNakSeo(true);
+				}else{
+					GCPLabUtil.toast('Failed to add your NakSeo!');
+				}
+			}
+		
+		});
+	}
+	
+	var isFetching = false;
+	var noMore = false;
+	
+	function fetchNakSeo(refresh){
+		if(isFetching) return false;
+		if(noMore){
+			return false;
+		}
+		
+		console.log('fetch!!!->'+refresh);
+		
+		isFetching = true;
+		$.ajax({
+			url:"/cmd/nakseo",
+			type:"GET",
+			data:{
+				encKey:$.cookie('gcplab_encKey'),
+				nextToken:refresh?'':$('#nextToken').val(),
+				fetch:$('#fetchOpt').val()
+			},
+			dataType:"json",
+			success:function(result){
+				if(result.result == 'success'){
+					var loggedInKey = $.cookie('gcplab_encKey');
+					
+					var prevHtml = '';
+					if(!refresh){
+						prevHtml = $('#listNakSeo').html();	
+					}
+					var newHtml = '';
+					var delHtml;
+					var imgHtml;
+					for(var i=0; i<result.nakseo.length; i++){
+						if(result.nakseo[i].encOwnerKey == loggedInKey){
+							delHtml = '[<a href=\"javascript:delNakseo(\''+result.nakseo[i].idx+'\');\" class=\"nakseo_del\">DEL</a>]';								
+						}else{
+							delHtml = '';
+						}
+						
+						if(result.nakseo[i].blobKey != undefined){
+							imgHtml = '<img src=\"/cmd/image?blobKey='+result.nakseo[i].blobKey+'\"><br>';
+						}else{
+							imgHtml = '';
+						}
+						
+						prevHtml += '<div>'+imgHtml+
+						'<span class=\"nakseo_content\">'+GCPLabUtil.decode(result.nakseo[i].content)+'</span>'+
+						'<span class=\"nakseo_postfix\">('+
+						'<span class=\"nakseo_owner\">'+result.nakseo[i].owner+'</span>'+
+						':'+
+						'<span class=\"nakseo_regdate\">'+result.nakseo[i].regDate+'</span>'+
+						')'+delHtml+'</span>'+
+						'</div>';
+					}
+					$('#listNakSeo').html(prevHtml+newHtml);
+					$('#nextToken').val(result.next);
+					
+				}else if(result.result == 'no_more'){
+					GCPLabUtil.toast('Fetched All!');
+					noMore = true;
+				}else{
+					GCPLabUtil.toast('Failed to fetch Nakseos!','error');
+				}
+				isFetching = false;
+				scrolled();
+			}
+		});
+	}
+	
+	function delNakseo(idxKey){
+		$.ajax({
+			url : '/cmd/nakseo',
+			type : 'DELETE',
+			dataType : 'json',
+			data : {
+				idx : idxKey,
+				encKey : $.cookie('gcplab_encKey')
+			},
+			success : function(resp){
+				if(resp.result == 'success'){
+					GCPLabUtil.toast('Successfully deleted.');
+				}else{
+					GCPLabUtil.toast('Failed to delete.');
+				}
+			}
+		});
+	}
+	
+	function editNakseo(idxKey){
+		$.ajax({
+			url : '/cmd/nakseo',
+			type : 'PUT',
+			dataType : 'json',
+			data : {
+				idx : idxKey,
+				content : 'update',
+				encKey : $.cookie('gcplab_encKey')
+			},
+			success : function(resp){
+				if(resp.result == 'success'){
+					GCPLabUtil.toast('Successfully updated.');
+				}else{
+					GCPLabUtil.toast('Failed to update.');
+				}
+			}
+		});
+	}
+	
+</script>
+<style>
+.nakseo_content{
+	margin-left:10px;
+}
+.nakseo_postfix{
+	margin-left:5px;
+	font-size:10px;
+	color:#CCCCCC;
+}
+.nakseo_regdate{
+
+}
+.nakseo_owner{
+	color:green;
+}
+.nakseo_del{
+	color : blue;
+}
+</style>
+</head>
+<body>
+<div style="width:100%" id="notSignedIn" align="center">
+	GCP Lab Tutorial #1 <br>
+	<a href="javascript:openModal('signInModal');" class="btn btn-primary">Sign In</a> or <a href="javascript:openModal('signUpModal');" class="btn">Sign Up</a>
+</div>
+
+<div class="modal fade" id="signUpModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+        <h4 class="modal-title">Sign Up!</h4>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+		    <label for="signUpIdStr">ID</label>
+		    <input type="email" class="form-control" id="signUpIdStr" placeholder="Enter ID">
+		  </div>
+		  <div class="form-group">
+		    <label for="signUpPwd">Password</label>
+		    <input type="password" class="form-control" id="signUpPwd" placeholder="Password">
+		  </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <a href="javascript:register()" class="btn btn-primary">Sign Up</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="signInModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+        <h4 class="modal-title">Sign In!</h4>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+		    <label for="signInIdStr">ID</label>
+		    <input type="email" class="form-control" id="signInIdStr" placeholder="Enter ID">
+		  </div>
+		  <div class="form-group">
+		    <label for=""signInPwd"">Password</label>
+		    <input type="password" class="form-control" id="signInPwd" placeholder="Password">
+		  </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <a href="javascript:signIn()" class="btn btn-primary">Sign In</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div style="width:100%" id="signedIn">
+	<span id="signedInID" style="color:blue;font-weight:bold;"></span> is signed in.
+	<a href="javascript:signOut();" class="btn">Sign out</a> 
+	<select id="fetchOpt">
+		<option value="all">All</option>
+		<option value="mine">Mine only</option>
+	</select>
+	<br>
+	<div id="addNakSeo">
+		<div class="input-group">
+	      <input type="text" class="form-control" id="newNakSeo">
+	      <span class="input-group-btn">
+	        <button class="btn btn-default" type="button" id="postBtn">Post!</button>
+	      </span><br>
+	      <img id="tmpImg">
+	    </div>
+	</div>
+	<div id="listNakSeo"></div>
+	<input type="hidden" id="nextToken">
+	<input type="hidden" id="blobKey">
+</div>
+</body>
+</html>
