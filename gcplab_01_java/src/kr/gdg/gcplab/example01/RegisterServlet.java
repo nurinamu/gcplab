@@ -9,6 +9,11 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.google.appengine.api.datastore.DatastoreService;
+import com.google.appengine.api.datastore.DatastoreServiceFactory;
+import com.google.appengine.api.datastore.Entity;
+import com.google.appengine.api.datastore.Key;
+import com.google.appengine.api.datastore.KeyFactory;
 import com.google.gson.JsonObject;
 
 public class RegisterServlet extends HttpServlet {
@@ -33,21 +38,37 @@ public class RegisterServlet extends HttpServlet {
         
         JsonObject retJson = new JsonObject();
         
+        
         if(idStr != null && password != null){
-            PersistenceManager pm = PMF.get().getPersistenceManager();
-            try{
-                JangE newJangE = new JangE(idStr);
-                newJangE.setPassword(password);
-                newJangE = pm.makePersistent(newJangE);
-                
-                retJson.addProperty("result", "success");
-                retJson.addProperty("idStr", newJangE.keyName());
-                retJson.addProperty("encKey", newJangE.encodedKey());
-            }finally{
-                if(pm != null){
-                    pm.close();
+        	
+        	if(DatastoreType.currentMode() == DatastoreType.USE_DATASTORE){
+        		DatastoreService ds = DatastoreServiceFactory.getDatastoreService();
+        		Entity newEntity = new Entity(KeyFactory.createKey(JangE.class.getSimpleName(), idStr));
+        		newEntity.setProperty("password", password);
+        		Key newKey = ds.put(newEntity);
+        		if(newKey != null){
+        			retJson.addProperty("result", "success");
+                    retJson.addProperty("idStr", newKey.getName());
+                    retJson.addProperty("encKey", KeyFactory.keyToString(newKey));
+        		}
+        	}else if(DatastoreType.currentMode() == DatastoreType.USE_PERSISTENT){
+        		PersistenceManager pm = PMF.get().getPersistenceManager();
+                try{
+                    JangE newJangE = new JangE(idStr);
+                    newJangE.setPassword(password);
+                    newJangE = pm.makePersistent(newJangE);
+                    
+                    retJson.addProperty("result", "success");
+                    retJson.addProperty("idStr", newJangE.keyName());
+                    retJson.addProperty("encKey", newJangE.encodedKey());
+                }finally{
+                    if(pm != null){
+                        pm.close();
+                    }
                 }
-            }
+    		}
+        	
+            
         }else{
             retJson.addProperty("result","fail");
         }
