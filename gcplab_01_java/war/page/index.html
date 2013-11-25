@@ -261,16 +261,16 @@
 	
 	function delNakseo(idxKey){
 		$.ajax({
-			url : '/cmd/nakseo',
+			url : '/cmd/nakseo?encKey='+$.cookie('gcplab_encKey')+'&idx='+idxKey,
 			type : 'DELETE',
 			dataType : 'json',
 			data : {
-				idx : idxKey,
-				encKey : $.cookie('gcplab_encKey')
 			},
 			success : function(resp){
 				if(resp.result == 'success'){
 					GCPLabUtil.toast('Successfully deleted.');
+					noMore = false;
+					fetchNakSeo(true);
 				}else{
 					GCPLabUtil.toast('Failed to delete.');
 				}
@@ -320,6 +320,7 @@
 </style>
 </head>
 <body>
+
 <div style="width:100%" id="notSignedIn" align="center">
 	GCP Lab Tutorial #1 <br>
 	<a href="javascript:openModal('signInModal');" class="btn btn-primary">Sign In</a> or <a href="javascript:openModal('signUpModal');" class="btn">Sign Up</a>
@@ -396,6 +397,11 @@
 	<div id="listNakSeo"></div>
 	<input type="hidden" id="nextToken">
 	<input type="hidden" id="blobKey">
+</div>
+
+<div style="position:fixed;bottom:0;display:block;background:#eeeeee;">
+	<a href="https://docs.google.com/spreadsheet/ccc?key=0AnVX3UGNfybWdGpna1k4RV9PMHJCSENKOUF2WHdseGc&usp=drive_web#gid=0" target="_blank">API Details</a><br>
+	<a href="https://drive.google.com/file/d/0B3VX3UGNfybWV2d4c01wazlJdkk/edit?usp=sharing" target="_blank">sample zip file</a>
 </div>
 </body>
 </html>

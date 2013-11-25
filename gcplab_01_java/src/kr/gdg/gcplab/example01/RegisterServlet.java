@@ -43,7 +43,7 @@ public class RegisterServlet extends HttpServlet {
         	
         	if(DatastoreType.currentMode() == DatastoreType.USE_DATASTORE){
         		DatastoreService ds = DatastoreServiceFactory.getDatastoreService();
-        		Entity newEntity = new Entity(KeyFactory.createKey(JangE.class.getSimpleName(), idStr));
+        		Entity newEntity = new Entity(JangE.class.getSimpleName(), idStr, JangE.PARENT_JANGE);
         		newEntity.setProperty("password", password);
         		Key newKey = ds.put(newEntity);
         		if(newKey != null){

@@ -1,8 +1,8 @@
 package kr.gdg.gcplab.example01;
 
 import java.io.IOException;
-import java.util.Date;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,10 +16,12 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.appengine.api.blobstore.BlobKey;
+import com.google.appengine.api.blobstore.BlobstoreServiceFactory;
 import com.google.appengine.api.datastore.Cursor;
 import com.google.appengine.api.datastore.DatastoreService;
 import com.google.appengine.api.datastore.DatastoreServiceFactory;
 import com.google.appengine.api.datastore.Entity;
+import com.google.appengine.api.datastore.EntityNotFoundException;
 import com.google.appengine.api.datastore.FetchOptions;
 import com.google.appengine.api.datastore.KeyFactory;
 import com.google.appengine.api.datastore.PreparedQuery;
@@ -40,9 +42,36 @@ public class NakSeoServlet extends HttpServlet {
     protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String encKey = req.getParameter("encKey");
         String idx = req.getParameter("idx");
+
+        JsonObject retObj = new JsonObject();
         
-        PersistenceManager pm = PMF.get().getPersistenceManager();
+        if(encKey != null && idx != null){
+        	if(DatastoreType.currentMode() == DatastoreType.USE_DATASTORE){
+            	DatastoreService ds = DatastoreServiceFactory.getDatastoreService();
+            	try {
+    				Entity entity = ds.get(KeyFactory.stringToKey(idx));
+    				if(KeyFactory.keyToString(entity.getKey().getParent()).equals(encKey)){
+    					BlobKey blobKey = (BlobKey)entity.getProperty("blobKey");
+    					if(blobKey != null){
+    						BlobstoreServiceFactory.getBlobstoreService().delete(blobKey);
+    					}
+    					ds.delete(KeyFactory.stringToKey(idx));
+    					retObj.addProperty("result", "success");
+    				}
+    			} catch (EntityNotFoundException e) {
+    				// TODO Auto-generated catch block
+    				e.printStackTrace();
+    			}
+            }else if(DatastoreType.currentMode() == DatastoreType.USE_PERSISTENT){
+            	PersistenceManager pm = PMF.get().getPersistenceManager();
+            }
+        }
         
+        if(retObj.get("result") == null){
+        	retObj.addProperty("result", "fail");
+        }
+        
+        resp.getWriter().write(retObj.toString());
     }
 
     @Override
@@ -61,6 +90,8 @@ public class NakSeoServlet extends HttpServlet {
         	if(encKey != null){
         		if(fetch != null && fetch.trim().equals("mine")){
         			fetchQuery.setAncestor(KeyFactory.stringToKey(encKey));
+        		}else{
+        			fetchQuery.setAncestor(JangE.PARENT_JANGE);
         		}
         	}
         	
